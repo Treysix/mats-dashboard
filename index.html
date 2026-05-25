@@ -769,10 +769,9 @@ function initSupabase() {
 async function syncFromSupabase() {
   if (!sbClient) return;
   try {
-    const { data: days, error: e1 } = await sbClient.from('goal_days').select('*');
-    if (!e1 && days) days.forEach(row => localStorage.setItem('goals:' + row.date, JSON.stringify(row.goals)));
-    const { data: streak, error: e2 } = await sbClient.from('goal_streak').select('*').eq('id', 1).single();
-    if (!e2 && streak) localStorage.setItem('goal_streak_v1', JSON.stringify({ count: streak.count, lastProcessedDate: streak.last_processed_date }));
+    const { data, error } = await sbClient.from('app_state').select('*');
+    if (error) throw error;
+    if (data) data.forEach(row => localStorage.setItem(row.key, JSON.stringify(row.data)));
     showSyncStatus('synced');
   } catch(e) {
     console.warn('Supabase sync failed — using local data', e);
@@ -782,33 +781,30 @@ async function syncFromSupabase() {
 
 function pushToSupabase(key, value) {
   if (!sbClient) return;
-  if (key.startsWith('goals:')) {
-    const date = key.replace('goals:', '');
-    sbClient.from('goal_days').upsert({ date, goals: value, updated_at: new Date().toISOString() }).then(({ error }) => { if (!error) showSyncStatus('synced'); });
-  } else if (key === 'goal_streak_v1') {
-    sbClient.from('goal_streak').upsert({ id: 1, count: value.count, last_processed_date: value.lastProcessedDate || '' }).then();
-  }
+  sbClient
+    .from('app_state')
+    .upsert({ key, data: value, updated_at: new Date().toISOString() })
+    .then(({ error }) => { if (!error) showSyncStatus('synced'); });
 }
 
 function deleteFromSupabase(key) {
   if (!sbClient) return;
-  if (key.startsWith('goals:')) {
-    const date = key.replace('goals:', '');
-    sbClient.from('goal_days').delete().eq('date', date).then();
-  }
+  sbClient.from('app_state').delete().eq('key', key).then();
 }
 
 function subscribeRealtime() {
   if (!sbClient) return;
   sbClient.channel('dashboard-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'goal_days' }, payload => {
-      if (payload.new && payload.new.date) {
-        localStorage.setItem('goals:' + payload.new.date, JSON.stringify(payload.new.goals));
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, payload => {
+      const row = payload.new;
+      if (!row || !row.key) return;
+      localStorage.setItem(row.key, JSON.stringify(row.data));
+      if (row.key.startsWith('goals:')) {
         loadToday();
         loadTomorrow();
         window.dispatchEvent(new CustomEvent('goals-changed'));
-        showSyncStatus('synced');
       }
+      showSyncStatus('synced');
     })
     .subscribe();
 }
