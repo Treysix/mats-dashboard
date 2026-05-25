@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -29,6 +29,7 @@
     color: var(--text-primary);
     background-color: #050506;
     overflow-x: hidden;
+  padding-bottom: 88px;
     padding: env(safe-area-inset-top, 0) 0 60px 0;
     position: relative;
   }
@@ -615,7 +616,46 @@
     .ring-pct { font-size: 32px; }
     .ring-status { font-size: 13px; }
   }
-</style>
+
+/* ═══════════════════════════════════════════════════════════
+   BOTTOM TAB BAR  (shared between index.html + po-coach.html)
+═══════════════════════════════════════════════════════════ */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  display: flex; justify-content: center;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(8,8,8,0) 0%, rgba(8,8,8,0.78) 38%, rgba(8,8,8,0.94) 100%);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+.tabbar-inner {
+  pointer-events: auto;
+  display: flex; width: 100%; max-width: 460px; gap: 6px;
+  padding: 6px;
+  background: rgba(20, 20, 22, 0.72);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+}
+.tab {
+  flex: 1 1 0; display: inline-flex; align-items: center;
+  justify-content: center; gap: 8px; padding: 12px 14px;
+  border-radius: 13px; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em; color: rgba(255,255,255,0.5);
+  text-decoration: none; background: transparent;
+  border: 1px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab:hover { color: #fff; }
+.tab[aria-current="page"] {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+}
+.tab-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+.tab-icon svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 480px) { .tab { padding: 11px 10px; font-size: 13px; } }</style>
 </head>
 <body>
 
@@ -1430,5 +1470,18 @@ function makeAddHandlers(inputEl, addBtn, polishBtn, key, statusEl, reload) {
   startTicker();
 })();
 </script>
+
+<nav class="tabbar" aria-label="Main navigation">
+  <div class="tabbar-inner">
+    <a class="tab" href="index.html" aria-current="page">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+      Dashboard
+    </a>
+    <a class="tab" href="po-coach.html">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5h11M6.5 17.5h11M4 9l2.5 3L4 15M20 9l-2.5 3L20 15"/></svg></span>
+      Gym
+    </a>
+  </div>
+</nav>
 </body>
 </html>
