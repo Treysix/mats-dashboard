@@ -617,6 +617,55 @@
   }
 
 /* ═══════════════════════════════════════════════════════════
+   HEALTH & RECOVERY WIDGET
+═══════════════════════════════════════════════════════════ */
+.health-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.health-ampel {
+  display: flex; align-items: center; gap: 12px;
+}
+.health-ampel-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #76746E;
+  transition: background 0.5s, box-shadow 0.5s;
+  flex-shrink: 0;
+}
+.health-ampel-label {
+  font-size: 17px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+.health-updated {
+  font-size: 11px; color: var(--text-tertiary);
+  text-align: right; line-height: 1.4;
+}
+.health-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+}
+@media (max-width: 480px) {
+  .health-metrics { grid-template-columns: repeat(2, 1fr); }
+}
+.health-metric {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.health-metric-val {
+  font-size: 20px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.5px; min-height: 28px;
+}
+.health-metric-key {
+  font-size: 11px; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.health-no-data {
+  text-align: center; padding: 12px 0;
+  color: var(--text-tertiary); font-size: 13px; line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════
    BOTTOM TAB BAR  (shared between index.html + po-coach.html)
 ═══════════════════════════════════════════════════════════ */
 .tabbar {
@@ -718,6 +767,41 @@
         <div class="ring-status" id="ringStatus">–</div>
         <div class="ring-remaining" id="ringRemaining">–</div>
         <div class="ring-range">8:00 AM – 12:00 AM</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ COMPONENT: Health & Recovery ══ -->
+  <div class="section" id="healthSection">
+    <div class="section-title">Health &amp; Recovery</div>
+    <div class="card" id="healthCard">
+      <div class="health-top">
+        <div class="health-ampel">
+          <div class="health-ampel-dot" id="healthAmpelDot"></div>
+          <div class="health-ampel-label" id="healthAmpelLabel">Warte auf Daten…</div>
+        </div>
+        <div class="health-updated" id="healthUpdated"></div>
+      </div>
+      <div class="health-metrics" id="healthMetrics">
+        <div class="health-metric">
+          <div class="health-metric-val" id="hmSleep">–</div>
+          <div class="health-metric-key">Schlaf</div>
+        </div>
+        <div class="health-metric">
+          <div class="health-metric-val" id="hmHRV">–</div>
+          <div class="health-metric-key">HRV</div>
+        </div>
+        <div class="health-metric">
+          <div class="health-metric-val" id="hmRHR">–</div>
+          <div class="health-metric-key">Ruhepuls</div>
+        </div>
+        <div class="health-metric">
+          <div class="health-metric-val" id="hmWorkouts">–</div>
+          <div class="health-metric-key">Trainings (7T)</div>
+        </div>
+      </div>
+      <div id="healthNoData" class="health-no-data" style="display:none">
+        Noch keine Daten — Apple Shortcut einrichten um täglich Schlafdaten &amp; HRV zu synchronisieren.
       </div>
     </div>
   </div>
@@ -832,6 +916,76 @@ function deleteFromSupabase(key) {
   sbClient.from('app_state').delete().eq('key', key).then();
 }
 
+/* ═══════════════════════════════════════════════════════════
+   HEALTH & RECOVERY WIDGET
+═══════════════════════════════════════════════════════════ */
+function getTrainingRecommendation(h) {
+  var sleep = h.sleep_hours || 0;
+  var hrv   = h.hrv || 0;
+  var base  = h.hrv_baseline || hrv || 1;
+  var ratio = hrv / base;
+  var score = 0;
+  if      (sleep >= 8) score += 3;
+  else if (sleep >= 7) score += 2;
+  else if (sleep >= 6) score += 1;
+  if      (ratio >= 1.00) score += 3;
+  else if (ratio >= 0.85) score += 2;
+  else if (ratio >= 0.70) score += 1;
+  if (score >= 5) return { color: '#6BE3A4', label: '🟢  Hart trainieren' };
+  if (score >= 3) return { color: '#F2C063', label: '🟡  Moderat trainieren' };
+  if (score >= 1) return { color: '#FF8C42', label: '🟠  Aktive Regeneration' };
+  return               { color: '#FF6B6B', label: '🔴  Rest Day' };
+}
+
+function renderHealth() {
+  var raw     = localStorage.getItem('health_daily');
+  var noData  = document.getElementById('healthNoData');
+  var metrics = document.getElementById('healthMetrics');
+  var dot     = document.getElementById('healthAmpelDot');
+  var lbl     = document.getElementById('healthAmpelLabel');
+  var upd     = document.getElementById('healthUpdated');
+  if (!raw) {
+    if (noData)  noData.style.display  = '';
+    if (metrics) metrics.style.display = 'none';
+    if (dot)     dot.style.background  = '#76746E';
+    if (lbl)     lbl.textContent       = 'Warte auf Daten…';
+    return;
+  }
+  if (noData)  noData.style.display  = 'none';
+  if (metrics) metrics.style.display = '';
+  var h   = JSON.parse(raw);
+  var rec = getTrainingRecommendation(h);
+  if (dot) { dot.style.background = rec.color; dot.style.boxShadow = '0 0 10px ' + rec.color + '80'; }
+  if (lbl) lbl.textContent = rec.label;
+  // Schlaf
+  var sleepEl = document.getElementById('hmSleep');
+  if (sleepEl && h.sleep_hours) {
+    var hrs  = Math.floor(h.sleep_hours);
+    var mins = Math.round((h.sleep_hours - hrs) * 60);
+    sleepEl.textContent = hrs + 'h' + (mins > 0 ? ' ' + mins + 'm' : '');
+  }
+  // HRV
+  var hrvEl = document.getElementById('hmHRV');
+  if (hrvEl && h.hrv) {
+    var arrow = h.hrv_baseline ? (h.hrv >= h.hrv_baseline ? ' ↑' : ' ↓') : '';
+    var aColor = h.hrv_baseline ? (h.hrv >= h.hrv_baseline ? '#6BE3A4' : '#FF6B6B') : '';
+    hrvEl.innerHTML = h.hrv + '<small style="font-size:13px;color:var(--text-tertiary)"> ms</small>'
+                    + (arrow ? '<span style="color:' + aColor + ';font-size:14px">' + arrow + '</span>' : '');
+  }
+  // Ruhepuls
+  var rhrEl = document.getElementById('hmRHR');
+  if (rhrEl && h.resting_hr) rhrEl.innerHTML = h.resting_hr + '<small style="font-size:13px;color:var(--text-tertiary)"> bpm</small>';
+  // Workouts 7d
+  var woEl = document.getElementById('hmWorkouts');
+  if (woEl && h.workouts_7d !== undefined) woEl.textContent = h.workouts_7d;
+  // Updated
+  if (upd && h.last_updated) {
+    var d = new Date(h.last_updated);
+    upd.textContent = d.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})
+                    + ' · ' + d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  }
+}
+
 function subscribeRealtime() {
   if (!sbClient) return;
   sbClient.channel('dashboard-sync')
@@ -844,6 +998,7 @@ function subscribeRealtime() {
         loadTomorrow();
         window.dispatchEvent(new CustomEvent('goals-changed'));
       }
+      if (row.key === 'health_daily') renderHealth();
       showSyncStatus('synced');
     })
     .subscribe();
@@ -1434,6 +1589,7 @@ function makeAddHandlers(inputEl, addBtn, polishBtn, key, statusEl, reload) {
   initSupabase();
   await syncFromSupabase();
   subscribeRealtime();
+  renderHealth();
   runRollover();
   runStreakCheck();
   setLabels();
